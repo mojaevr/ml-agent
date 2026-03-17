@@ -1,0 +1,24 @@
+# Environment & secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+
+# Data (large CSVs)
+data/train_full.csv
+data/train.csv
+data/val.csv
+data/test.csv
+
+# Runs & artifacts
+runs/
+submission.csv
+
+# Budget log
+budget_log.json
+
+# Memory (agent attempt history)
+memory/attempts_log.json

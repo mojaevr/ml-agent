@@ -1,0 +1,304 @@
+{
+  "total_rows_approx": 352321,
+  "total_feature_cols": 29,
+  "target_info": {
+    "distribution": {
+      "1": 25210,
+      "0": 24790
+    },
+    "imbalance_ratio": 1.02
+  },
+  "columns": {
+    "numeric": [
+      "id",
+      "return_1d",
+      "return_5d",
+      "return_10d",
+      "return_20d",
+      "sma_ratio_5",
+      "sma_ratio_10",
+      "sma_ratio_20",
+      "sma_ratio_50",
+      "sma_ratio_200",
+      "ema_ratio_12",
+      "ema_ratio_26",
+      "macd_hist",
+      "rsi_14",
+      "bb_position",
+      "volatility_10d",
+      "volatility_20d",
+      "volatility_60d",
+      "volume_sma_ratio_10",
+      "volume_sma_ratio_20",
+      "daily_range",
+      "avg_range_10d",
+      "high_low_ratio",
+      "momentum_10d",
+      "momentum_20d",
+      "roc_5",
+      "roc_10",
+      "atr_14"
+    ],
+    "categorical": [],
+    "high_cardinality": [
+      "stock_id"
+    ],
+    "id_like": []
+  },
+  "numeric_stats": {
+    "id": {
+      "dtype": "int64",
+      "mean": 220139.3594,
+      "std": 127237.0665,
+      "min": 5.0,
+      "max": 440390.0,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "return_1d": {
+      "dtype": "float64",
+      "mean": 0.001,
+      "std": 0.0258,
+      "min": -0.4405,
+      "max": 0.5602,
+      "null_pct": 0.0,
+      "zeros_pct": 3.12
+    },
+    "return_5d": {
+      "dtype": "float64",
+      "mean": 0.0045,
+      "std": 0.0555,
+      "min": -0.5579,
+      "max": 0.7996,
+      "null_pct": 0.0,
+      "zeros_pct": 1.25
+    },
+    "return_10d": {
+      "dtype": "float64",
+      "mean": 0.0087,
+      "std": 0.0765,
+      "min": -0.6781,
+      "max": 1.1207,
+      "null_pct": 0.0,
+      "zeros_pct": 0.83
+    },
+    "return_20d": {
+      "dtype": "float64",
+      "mean": 0.0171,
+      "std": 0.1086,
+      "min": -0.7649,
+      "max": 1.5817,
+      "null_pct": 0.0,
+      "zeros_pct": 0.59
+    },
+    "sma_ratio_5": {
+      "dtype": "float64",
+      "mean": 1.0013,
+      "std": 0.028,
+      "min": 0.63,
+      "max": 1.4604,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "sma_ratio_10": {
+      "dtype": "float64",
+      "mean": 1.003,
+      "std": 0.0414,
+      "min": 0.5534,
+      "max": 1.5313,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "sma_ratio_20": {
+      "dtype": "float64",
+      "mean": 1.0063,
+      "std": 0.0595,
+      "min": 0.4244,
+      "max": 1.6798,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "sma_ratio_50": {
+      "dtype": "float64",
+      "mean": 1.0158,
+      "std": 0.0951,
+      "min": 0.2678,
+      "max": 2.0399,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "sma_ratio_200": {
+      "dtype": "float64",
+      "mean": 1.0636,
+      "std": 0.1948,
+      "min": 0.0598,
+      "max": 2.9902,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "ema_ratio_12": {
+      "dtype": "float64",
+      "mean": 1.0031,
+      "std": 0.0387,
+      "min": 0.5604,
+      "max": 1.5099,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "ema_ratio_26": {
+      "dtype": "float64",
+      "mean": 1.0069,
+      "std": 0.0584,
+      "min": 0.4197,
+      "max": 1.6546,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "macd_hist": {
+      "dtype": "float64",
+      "mean": 0.0001,
+      "std": 0.0084,
+      "min": -0.1665,
+      "max": 0.1137,
+      "null_pct": 0.0,
+      "zeros_pct": 0.01
+    },
+    "rsi_14": {
+      "dtype": "float64",
+      "mean": 53.0737,
+      "std": 16.7181,
+      "min": 0.0,
+      "max": 100.984,
+      "null_pct": 0.0,
+      "zeros_pct": 0.04
+    },
+    "bb_position": {
+      "dtype": "float64",
+      "mean": 0.1007,
+      "std": 0.6442,
+      "min": -2.0552,
+      "max": 2.1288,
+      "null_pct": 0.0,
+      "zeros_pct": 0.06
+    },
+    "volatility_10d": {
+      "dtype": "float64",
+      "mean": 0.336,
+      "std": 0.2393,
+      "min": 0.0,
+      "max": 3.4097,
+      "null_pct": 0.0,
+      "zeros_pct": 0.03
+    },
+    "volatility_20d": {
+      "dtype": "float64",
+      "mean": 0.3458,
+      "std": 0.2224,
+      "min": 0.015,
+      "max": 2.6144,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "volatility_60d": {
+      "dtype": "float64",
+      "mean": 0.3577,
+      "std": 0.2009,
+      "min": 0.0476,
+      "max": 1.9151,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "volume_sma_ratio_10": {
+      "dtype": "float64",
+      "mean": 1.0104,
+      "std": 0.4684,
+      "min": 0.0,
+      "max": 9.7919,
+      "null_pct": 0.0,
+      "zeros_pct": 0.3
+    },
+    "volume_sma_ratio_20": {
+      "dtype": "float64",
+      "mean": 1.0135,
+      "std": 0.5641,
+      "min": 0.0,
+      "max": 18.259,
+      "null_pct": 0.0,
+      "zeros_pct": 0.3
+    },
+    "daily_range": {
+      "dtype": "float64",
+      "mean": 0.0349,
+      "std": 0.0287,
+      "min": 0.0,
+      "max": 0.8736,
+      "null_pct": 0.0,
+      "zeros_pct": 0.78
+    },
+    "avg_range_10d": {
+      "dtype": "float64",
+      "mean": 0.035,
+      "std": 0.0233,
+      "min": 0.0,
+      "max": 0.4736,
+      "null_pct": 0.0,
+      "zeros_pct": 0.11
+    },
+    "high_low_ratio": {
+      "dtype": "float64",
+      "mean": 1.0297,
+      "std": 0.024,
+      "min": 0.9902,
+      "max": 1.6061,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "momentum_10d": {
+      "dtype": "float64",
+      "mean": 1.0088,
+      "std": 0.0768,
+      "min": 0.3277,
+      "max": 2.1213,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "momentum_20d": {
+      "dtype": "float64",
+      "mean": 1.0171,
+      "std": 0.1087,
+      "min": 0.2387,
+      "max": 2.5673,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    },
+    "roc_5": {
+      "dtype": "float64",
+      "mean": 0.0045,
+      "std": 0.0555,
+      "min": -0.5604,
+      "max": 0.7992,
+      "null_pct": 0.0,
+      "zeros_pct": 1.25
+    },
+    "roc_10": {
+      "dtype": "float64",
+      "mean": 0.0087,
+      "std": 0.0765,
+      "min": -0.675,
+      "max": 1.1098,
+      "null_pct": 0.0,
+      "zeros_pct": 0.83
+    },
+    "atr_14": {
+      "dtype": "float64",
+      "mean": 0.2675,
+      "std": 0.6193,
+      "min": 0.008,
+      "max": 10.1569,
+      "null_pct": 0.0,
+      "zeros_pct": 0.0
+    }
+  },
+  "categorical_stats": {},
+  "global_missing": {}
+}
