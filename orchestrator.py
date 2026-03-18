@@ -40,7 +40,7 @@ from sandbox_runner import run_predict_code, run_training_code
 from validator import compute_roc_auc, generate_submission
 
 RUNS_DIR = Path("runs")
-DEFAULT_MODEL = "deepseek/deepseek-r1"
+DEFAULT_MODEL = "deepseek/deepseek-v3.2"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -440,7 +440,7 @@ def run_parallel_round(
 # CLI
 # ─────────────────────────────────────────────────────────────
 
-def generate_kaggle_submission(run_id: Optional[str] = None, output: str = "submission.csv"):
+def generate_kaggle_submission(run_id: Optional[str] = None, output: Optional[str] = None):
     if run_id is None:
         best = get_best_attempt()
         if not best:
@@ -448,6 +448,9 @@ def generate_kaggle_submission(run_id: Optional[str] = None, output: str = "subm
             return
         run_id = best["run_id"]
         print(f"📦 Лучший run: {run_id} (ROC-AUC: {best['roc_auc']:.6f})")
+
+    if output is None:
+        output = f"{run_id}.csv"
 
     run_dir = RUNS_DIR / run_id
     predict_path = run_dir / "predict_code.py"
@@ -510,10 +513,15 @@ def main():
     parser.add_argument("--no-discussion", action="store_true")
     parser.add_argument("--submit", action="store_true")
     parser.add_argument("--run_id", type=str, default=None)
-    parser.add_argument("--output", default="submission.csv")
+    parser.add_argument("--output", default=None)
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--prepare_data", action="store_true")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Показывать полный ответ LLM и код")
     args = parser.parse_args()
+
+    if args.verbose:
+        import agent_loop
+        agent_loop.VERBOSE = True
 
     if args.list:
         list_runs(); return

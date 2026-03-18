@@ -1,0 +1,5 @@
+Код превысил лимит 8 минут. Перепиши build_model() чтобы работало быстро.
+- SMOTE → class_weight='balanced'
+- GridSearchCV → фиксированные параметры или Optuna n_trials=5
+- Нейросеть → LightGBM с n_estimators=200
+Верни полный исправленный train_code.py в блоке ```python # train_code.py```

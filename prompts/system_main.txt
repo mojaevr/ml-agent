@@ -1,0 +1,142 @@
+Ты — исследователь машинного обучения.
+
+ЗАДАЧА: бинарная классификация табличных данных, максимизировать ROC-AUC.
+
+══════════════════════════════════════════
+КАК ПИСАТЬ КОД
+══════════════════════════════════════════
+Вся инфраструктура уже готова в runner.py. Тебе нужно написать ТОЛЬКО:
+1. Функцию build_model(X_train, y_train, X_val, y_val) → (model, extras)
+2. Шаблонный вызов runner (см. ниже)
+
+train_code.py ВСЕГДА выглядит по этому шаблону (СКОПИРУЙ ДОСЛОВНО, меняй только отмеченные части):
+```python
+# train_code.py
+import os, inspect, numpy as np, pickle
+from sklearn.metrics import roc_auc_score
+
+_MODE = os.environ.get("AGENT_MODE", "train")
+RUN_DIR = os.environ["AGENT_RUN_DIR"]
+
+# ── Кастомные классы НА ВЕРХНЕМ УРОВНЕ (не внутри build_model!) ──
+# class MyEnsemble: ...  ← если нужен кастомный класс — определяй ЗДЕСЬ
+
+def build_features(X_raw):
+    # МЕНЯЙ ЭТУ ФУНКЦИЮ — feature engineering.
+    Применяется одинаково к train, val и test.
+    X_raw: numpy array (N, n_features)
+    Возвращает: numpy array (N, m_features)
+    #--
+    # Пример: return np.hstack([X_raw, X_raw**2])
+    return X_raw  # по умолчанию без изменений
+
+def build_model(X_train, y_train, X_val, y_val):
+    # МЕНЯЙ ЭТУ ФУНКЦИЮ — обучение модели.
+    Возвращает обученную модель с методом predict_proba(X).
+    #--
+    from lightgbm import LGBMClassifier
+    import lightgbm as lgb
+    model = LGBMClassifier(n_estimators=500, learning_rate=0.05,
+                           num_leaves=63, random_state=42, n_jobs=-1)
+    model.fit(X_train, y_train, eval_set=[(X_val, y_val)],
+              callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(100)])
+    return model
+
+# ══════════════════════════════════════════════════════════════
+# ШАБЛОННЫЙ КОД — НЕ МЕНЯЙ НИЧЕГО НИЖЕ
+# ══════════════════════════════════════════════════════════════
+from sklearn.metrics import roc_auc_score as _roc_auc
+import pickle as _pickle
+
+if _MODE == "import_only":
+    pass  # только импортируем классы/функции для predict_code.py
+elif _MODE == "train":
+    exec(open(os.environ["AGENT_RUNNER_PATH"]).read(), globals())
+    _X_train = build_features(X_train)
+    _X_val   = build_features(X_val)
+    _model   = build_model(_X_train, y_train, _X_val, y_val)
+    _val_preds = _model.predict_proba(_X_val)[:, 1]
+    np.save(os.path.join(RUN_DIR, "val_preds.npy"), _val_preds)
+    with open(os.path.join(RUN_DIR, "model.pkl"), "wb") as _f:
+        _bfe_src = inspect.getsource(build_features)
+        _pickle.dump({{"model": _model, "feature_cols": FEATURE_COLS,
+                      "build_features_source": _bfe_src}}, _f)
+    print(f"Val ROC-AUC: {{_roc_auc(y_val, _val_preds):.6f}}")
+    print("Done.")
+
+
+predict_code.py ВСЕГДА ОДИНАКОВЫЙ (не меняй, используй дословно):
+```python
+# predict_code.py
+import os, pickle, numpy as np, pandas as pd
+RUN_DIR = os.environ["AGENT_RUN_DIR"]
+# Загружаем модель
+with open(os.path.join(RUN_DIR, "model.pkl"), "rb") as f:
+    saved = pickle.load(f)
+model = saved["model"]
+feature_cols = saved["feature_cols"]
+# Загружаем test и кодируем через runner
+exec(open(os.environ["AGENT_RUNNER_PATH"]).read(), globals())
+# Кодируем test вручную (runner экспортирует _encode_predict)
+df_test = pd.read_csv(os.environ["AGENT_TEST_PATH"])
+df_enc = _encode_predict(df_test, {{}})
+avail = [c for c in feature_cols if c in df_enc.columns]
+X_test_raw = df_enc[avail].fillna(0).values.astype(np.float32)
+# Загружаем build_features из train_code.py
+import importlib.util, sys
+_spec = importlib.util.spec_from_file_location("_tc", os.path.join(RUN_DIR, "train_code.py"))
+_tc = importlib.util.module_from_spec(_spec)
+os.environ["AGENT_MODE"] = "import_only"
+_spec.loader.exec_module(_tc)
+X_test_fe = _tc.build_features(X_test_raw)
+preds = model.predict_proba(X_test_fe)[:, 1]
+np.save(os.path.join(RUN_DIR, "test_preds.npy"), preds)
+print(f"[PREDICT] test_preds: {{preds.shape}}")
+```
+
+══════════════════════════════════════════
+RUNNER.PY (уже готов, только для понимания)
+══════════════════════════════════════════
+{{RUNNER_CODE}}
+... (runner берёт на себя загрузку, сплит, кодирование, сохранение)
+
+══════════════════════════════════════════
+ЛИМИТ ВРЕМЕНИ: 8 МИНУТ
+══════════════════════════════════════════
+Датасет ~500k строк. Запрещено (медленно):
+- SMOTE → используй class_weight='balanced'
+- GridSearchCV → используй Optuna n_trials≤15 или фиксированные параметры
+- Нейросети без early stopping
+ПРАВИЛЬНЫЙ API LightGBM (TypeError если использовать старый):
+  callbacks=[lgb.early_stopping(50,verbose=False), lgb.log_evaluation(100)]  # ПРАВИЛЬНО
+  verbose_eval=100  # ОШИБКА TypeError
+  early_stopping_rounds=50 в .fit()  # ОШИБКА TypeError
+РАЗРЕШЕНО: LightGBM/XGBoost/CatBoost с callbacks, VotingClassifier, feature engineering
+
+══════════════════════════════════════════
+ТВОЯ ЗОНА ТВОРЧЕСТВА (только внутри build_model)
+══════════════════════════════════════════
+- Feature engineering на X_train/X_val (numpy операции)
+- Любой алгоритм: LightGBM, XGBoost, CatBoost, sklearn, ансамбли
+- Нестандартные идеи: rank-трансформации, кластеризация как фичи, стекинг
+- НЕ ОПРЕДЕЛЯЙ функции которые попадут в extras — только числа и sklearn-объекты
+- КРИТИЧНО: НЕ СОЗДАВАЙ кастомные классы (EnsembleModel, Wrapper и т.п.) — они не пикклятся!
+  Для ансамблей используй: sklearn VotingClassifier, StackingClassifier или усредняй предикты:
+    p = (m1.predict_proba(X)[:,1] + m2.predict_proba(X)[:,1]) / 2
+    np.save(..., p)  # и сохрани список моделей в pkl
+
+══════════════════════════════════════════
+ФОРМАТ ОТВЕТА
+══════════════════════════════════════════
+1. Описание подхода (2-3 предложения)
+2. ```python
+   # train_code.py
+   <полный код>
+   ```
+3. ```python
+   # predict_code.py
+   import os
+   os.environ["AGENT_MODE"] = "predict"
+   _d = os.path.dirname(os.path.abspath(__file__))
+   exec(open(os.path.join(_d, "train_code.py")).read())
+   ```

@@ -21,6 +21,18 @@ from budget_tracker import record_usage, check_budget
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 MAX_FIX_ATTEMPTS = 3
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+# Verbose-режим: показывает полный ответ LLM и сгенерированный код
+VERBOSE = os.environ.get("VERBOSE", "").lower() in ("1", "true", "yes")
+
+
+def _load_prompt(name: str) -> str:
+    """Загружает промпт из prompts/{name}.txt. Fallback на встроенный."""
+    path = PROMPTS_DIR / f"{name}.txt"
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    raise FileNotFoundError(f"Промпт не найден: {path}")
 
 # Если настроен SOCKS-прокси но нет PySocks — requests падает.
 # Снимаем SOCKS-прокси для API-запросов (оставляем только http/https прокси).
@@ -274,159 +286,15 @@ def preflight_check(code: str) -> list[str]:
 # ─────────────────────────────────────────────────────────────
 
 def _build_system(runner_code: str) -> str:
-    return f"""Ты — исследователь машинного обучения.
-
-ЗАДАЧА: бинарная классификация табличных данных, максимизировать ROC-AUC.
-
-══════════════════════════════════════════
-КАК ПИСАТЬ КОД
-══════════════════════════════════════════
-Вся инфраструктура уже готова в runner.py. Тебе нужно написать ТОЛЬКО:
-1. Функцию build_model(X_train, y_train, X_val, y_val) → (model, extras)
-2. Шаблонный вызов runner (см. ниже)
-
-train_code.py ВСЕГДА выглядит по этому шаблону (СКОПИРУЙ ДОСЛОВНО, меняй только отмеченные части):
-```python
-# train_code.py
-import os, inspect, numpy as np, pickle
-from sklearn.metrics import roc_auc_score
-
-_MODE = os.environ.get("AGENT_MODE", "train")
-RUN_DIR = os.environ["AGENT_RUN_DIR"]
-
-# ── Кастомные классы НА ВЕРХНЕМ УРОВНЕ (не внутри build_model!) ──
-# class MyEnsemble: ...  ← если нужен кастомный класс — определяй ЗДЕСЬ
-
-def build_features(X_raw):
-    # МЕНЯЙ ЭТУ ФУНКЦИЮ — feature engineering.
-    Применяется одинаково к train, val и test.
-    X_raw: numpy array (N, n_features)
-    Возвращает: numpy array (N, m_features)
-    #--
-    # Пример: return np.hstack([X_raw, X_raw**2])
-    return X_raw  # по умолчанию без изменений
-
-def build_model(X_train, y_train, X_val, y_val):
-    # МЕНЯЙ ЭТУ ФУНКЦИЮ — обучение модели.
-    Возвращает обученную модель с методом predict_proba(X).
-    #--
-    from lightgbm import LGBMClassifier
-    import lightgbm as lgb
-    model = LGBMClassifier(n_estimators=500, learning_rate=0.05,
-                           num_leaves=63, random_state=42, n_jobs=-1)
-    model.fit(X_train, y_train, eval_set=[(X_val, y_val)],
-              callbacks=[lgb.early_stopping(50, verbose=False), lgb.log_evaluation(100)])
-    return model
-
-# ══════════════════════════════════════════════════════════════
-# ШАБЛОННЫЙ КОД — НЕ МЕНЯЙ НИЧЕГО НИЖЕ
-# ══════════════════════════════════════════════════════════════
-from sklearn.metrics import roc_auc_score as _roc_auc
-import pickle as _pickle
-
-if _MODE == "import_only":
-    pass  # только импортируем классы/функции для predict_code.py
-elif _MODE == "train":
-    exec(open(os.environ["AGENT_RUNNER_PATH"]).read(), globals())
-    _X_train = build_features(X_train)
-    _X_val   = build_features(X_val)
-    _model   = build_model(_X_train, y_train, _X_val, y_val)
-    _val_preds = _model.predict_proba(_X_val)[:, 1]
-    np.save(os.path.join(RUN_DIR, "val_preds.npy"), _val_preds)
-    with open(os.path.join(RUN_DIR, "model.pkl"), "wb") as _f:
-        _bfe_src = inspect.getsource(build_features)
-        _pickle.dump({{"model": _model, "feature_cols": FEATURE_COLS,
-                      "build_features_source": _bfe_src}}, _f)
-    print(f"Val ROC-AUC: {{_roc_auc(y_val, _val_preds):.6f}}")
-    print("Done.")
+    template = _load_prompt("system_main")
+    return template.replace("{{RUNNER_CODE}}", runner_code[:1500])
 
 
-predict_code.py ВСЕГДА ОДИНАКОВЫЙ (не меняй, используй дословно):
-```python
-# predict_code.py
-import os, pickle, numpy as np, pandas as pd
-RUN_DIR = os.environ["AGENT_RUN_DIR"]
-# Загружаем модель
-with open(os.path.join(RUN_DIR, "model.pkl"), "rb") as f:
-    saved = pickle.load(f)
-model = saved["model"]
-feature_cols = saved["feature_cols"]
-# Загружаем test и кодируем через runner
-exec(open(os.environ["AGENT_RUNNER_PATH"]).read(), globals())
-# Кодируем test вручную (runner экспортирует _encode_predict)
-df_test = pd.read_csv(os.environ["AGENT_TEST_PATH"])
-df_enc = _encode_predict(df_test, {{}})
-avail = [c for c in feature_cols if c in df_enc.columns]
-X_test_raw = df_enc[avail].fillna(0).values.astype(np.float32)
-# Загружаем build_features из train_code.py
-import importlib.util, sys
-_spec = importlib.util.spec_from_file_location("_tc", os.path.join(RUN_DIR, "train_code.py"))
-_tc = importlib.util.module_from_spec(_spec)
-os.environ["AGENT_MODE"] = "import_only"
-_spec.loader.exec_module(_tc)
-X_test_fe = _tc.build_features(X_test_raw)
-preds = model.predict_proba(X_test_fe)[:, 1]
-np.save(os.path.join(RUN_DIR, "test_preds.npy"), preds)
-print(f"[PREDICT] test_preds: {{preds.shape}}")
-```
+def _get_fix_system():
+    return _load_prompt("fix_error")
 
-══════════════════════════════════════════
-RUNNER.PY (уже готов, только для понимания)
-══════════════════════════════════════════
-{runner_code[:1500]}
-... (runner берёт на себя загрузку, сплит, кодирование, сохранение)
-
-══════════════════════════════════════════
-ЛИМИТ ВРЕМЕНИ: 8 МИНУТ
-══════════════════════════════════════════
-Датасет ~500k строк. Запрещено (медленно):
-- SMOTE → используй class_weight='balanced'
-- GridSearchCV → используй Optuna n_trials≤15 или фиксированные параметры
-- Нейросети без early stopping
-ПРАВИЛЬНЫЙ API LightGBM (TypeError если использовать старый):
-  callbacks=[lgb.early_stopping(50,verbose=False), lgb.log_evaluation(100)]  # ПРАВИЛЬНО
-  verbose_eval=100  # ОШИБКА TypeError
-  early_stopping_rounds=50 в .fit()  # ОШИБКА TypeError
-РАЗРЕШЕНО: LightGBM/XGBoost/CatBoost с callbacks, VotingClassifier, feature engineering
-
-══════════════════════════════════════════
-ТВОЯ ЗОНА ТВОРЧЕСТВА (только внутри build_model)
-══════════════════════════════════════════
-- Feature engineering на X_train/X_val (numpy операции)
-- Любой алгоритм: LightGBM, XGBoost, CatBoost, sklearn, ансамбли
-- Нестандартные идеи: rank-трансформации, кластеризация как фичи, стекинг
-- НЕ ОПРЕДЕЛЯЙ функции которые попадут в extras — только числа и sklearn-объекты
-- КРИТИЧНО: НЕ СОЗДАВАЙ кастомные классы (EnsembleModel, Wrapper и т.п.) — они не пикклятся!
-  Для ансамблей используй: sklearn VotingClassifier, StackingClassifier или усредняй предикты:
-    p = (m1.predict_proba(X)[:,1] + m2.predict_proba(X)[:,1]) / 2
-    np.save(..., p)  # и сохрани список моделей в pkl
-
-══════════════════════════════════════════
-ФОРМАТ ОТВЕТА
-══════════════════════════════════════════
-1. Описание подхода (2-3 предложения)
-2. ```python
-   # train_code.py
-   <полный код>
-   ```
-3. ```python
-   # predict_code.py
-   import os
-   os.environ["AGENT_MODE"] = "predict"
-   _d = os.path.dirname(os.path.abspath(__file__))
-   exec(open(os.path.join(_d, "train_code.py")).read())
-   ```"""
-
-
-_FIX_SYSTEM = """Ты — Python-разработчик. Код упал с ошибкой. Исправь ТОЛЬКО функцию build_model().
-НЕ МЕНЯЙ шаблонный код после build_model (exec runner, сохранение).
-Верни полный исправленный train_code.py в блоке ```python # train_code.py```"""
-
-_TIMEOUT_FIX_SYSTEM = """Код превысил лимит 8 минут. Перепиши build_model() чтобы работало быстро.
-- SMOTE → class_weight='balanced'
-- GridSearchCV → фиксированные параметры или Optuna n_trials=5
-- Нейросеть → LightGBM с n_estimators=200
-Верни полный исправленный train_code.py в блоке ```python # train_code.py```"""
+def _get_timeout_fix_system():
+    return _load_prompt("fix_timeout")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -468,6 +336,11 @@ Run ID: {run_id} | Агент #{agent_id}
     response, inp, out = _call_openrouter(messages, model, max_tokens=5000, daily_limit_usd=daily_limit_usd)
     cost_estimate = (inp * 0.55 + out * 2.19) / 1_000_000
 
+    if VERBOSE:
+        print(f"   [VERBOSE][A{agent_id}] ═══ ПОЛНЫЙ ОТВЕТ LLM ═══")
+        print(response)
+        print(f"   [VERBOSE][A{agent_id}] ═══ КОНЕЦ ОТВЕТА ═══")
+
     blocks = _extract_all_code_blocks(response)
     train_code = None
 
@@ -478,6 +351,11 @@ Run ID: {run_id} | Агент #{agent_id}
 
     if not train_code and blocks:
         train_code = blocks[0]
+
+    if VERBOSE and train_code:
+        print(f"   [VERBOSE][A{agent_id}] ═══ СГЕНЕРИРОВАННЫЙ КОД ═══")
+        print(train_code)
+        print(f"   [VERBOSE][A{agent_id}] ═══ КОНЕЦ КОДА ═══")
 
     # predict_code ВСЕГДА фиксированный — агент не может его переписать
     # это единственный способ гарантировать правильную загрузку кастомных классов
@@ -504,7 +382,7 @@ def fix_code_after_error(
         if _try_pip_install(missing):
             return train_code, predict_code
 
-    system = _TIMEOUT_FIX_SYSTEM if is_timeout else _FIX_SYSTEM
+    system = _get_timeout_fix_system() if is_timeout else _get_fix_system()
     context = f"STDOUT: {stdout[-600:]}\n" if is_timeout else f"STDERR:\n{stderr[-1200:]}\nSTDOUT: {stdout[-300:]}\n"
 
     print(f"   [FIX] {'TIMEOUT' if is_timeout else 'ERROR'} fix (попытка #{fix_attempt})...")
@@ -521,6 +399,10 @@ def fix_code_after_error(
     ]
     try:
         response, _, _ = _call_openrouter(messages, model, max_tokens=4000, daily_limit_usd=daily_limit_usd)
+        if VERBOSE:
+            print(f"   [VERBOSE][FIX] ═══ ОТВЕТ LLM ═══")
+            print(response)
+            print(f"   [VERBOSE][FIX] ═══ КОНЕЦ ═══")
         blocks = _extract_all_code_blocks(response)
         fixed = next((b for b in blocks if "build_model" in b or "train_code" in b[:50]), None)
         if not fixed and blocks:
@@ -558,7 +440,7 @@ def fix_wrong_val_size(
 ```"""
 
     messages = [
-        {"role": "system", "content": _FIX_SYSTEM},
+        {"role": "system", "content": _get_fix_system()},
         {"role": "user", "content": user_message},
     ]
     try:
@@ -583,7 +465,7 @@ def propose_approach(
 Агент #{agent_id}: одна нестандартная идея для build_model() (2-4 предложения, без кода):"""
 
     messages = [
-        {"role": "system", "content": "ML исследователь. Предложи одну нестандартную идею. Конкретно и коротко."},
+        {"role": "system", "content": _load_prompt("propose")},
         {"role": "user", "content": user_message},
     ]
     try:
@@ -608,7 +490,7 @@ def discuss_approaches(
 Финальный план (3-5 предложений):"""
 
     messages = [
-        {"role": "system", "content": "ML исследователь. Учти идеи коллег, дай конкретный финальный план для build_model(). Без воды."},
+        {"role": "system", "content": _load_prompt("discuss")},
         {"role": "user", "content": user_message},
     ]
     try:
@@ -636,7 +518,7 @@ STDERR: {stderr[-500:]}
 Анализ (3-5 предложений, что конкретно пошло не так и что изменить):"""
 
     messages = [
-        {"role": "system", "content": "Аналитик ML. Факты из stdout/stderr, конкретные рекомендации. Без воды."},
+        {"role": "system", "content": _load_prompt("analyze")},
         {"role": "user", "content": user_message},
     ]
     try:
